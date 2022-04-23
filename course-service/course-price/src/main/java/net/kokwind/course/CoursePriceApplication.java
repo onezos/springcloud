@@ -7,8 +7,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * 描述： 项目启动类
  */
 @SpringBootApplication
-public class CourseListApplication {
+public class CoursePriceApplication {
     public static void main(String[] args) {
-        SpringApplication.run(CourseListApplication.class, args);
+        SpringApplication.run(CoursePriceApplication.class, args);
     }
 }
