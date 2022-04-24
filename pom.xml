@@ -6,6 +6,7 @@
     <modules>
         <module>course-service</module>
         <module>eureka-service</module>
+        <module>course-zuul</module>
     </modules>
     <parent>
         <groupId>org.springframework.boot</groupId>

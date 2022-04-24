@@ -5,6 +5,7 @@ package net.kokwind.course.controller;
 
 import net.kokwind.course.client.CourseListClient;
 import net.kokwind.course.entity.Course;
+import net.kokwind.course.entity.CourseAndPrice;
 import net.kokwind.course.entity.CoursePrice;
 import net.kokwind.course.service.CoursePriceService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,5 +31,11 @@ public class CoursePriceController {
     public List<Course> getCourseListInPrice() {
         List<Course> courses = courseListClient.courseList();
         return courses;
+    }
+
+    @GetMapping("/coursesAndPrice")
+    public List<CourseAndPrice> getCourseAndPrice() {
+        List<CourseAndPrice> courseAndPrice = coursePriceService.getCourseAndPrice();
+        return courseAndPrice;
     }
 }

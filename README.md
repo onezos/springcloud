@@ -1002,14 +1002,427 @@ public interface CourseListClient {
 
 ![img_1.png](img/img12.png)
 
+#### 2.8.3 整合两个服务
+
+整合课程列表和价格
+
+新建列表和价格的融合类
+
+```java
+package net.kokwind.course.entity;
+
+import java.io.Serializable;
+
+public class CourseAndPrice implements Serializable {
+    private Integer id;
+    private Integer courseId;
+    private String name;
+    private Integer price;
+
+    public Integer getId() {
+        return id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    public Integer getCourseId() {
+        return courseId;
+    }
+
+    public void setCourseId(Integer courseId) {
+        this.courseId = courseId;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public Integer getPrice() {
+        return price;
+    }
+
+    public void setPrice(Integer price) {
+        this.price = price;
+    }
+}
+```
+
+
+
+因为已经存在查询课程列表和价格的接口，所以不需要新建DAO
+
+在service中添加新的方法`getCourseAndPrice()`
+
+把查询到的课程列表添加上价格并返回
+
+```java
+package net.kokwind.course.service;
+/**
+ * 描述： 课程价格服务
+ */
+
+import net.kokwind.course.client.CourseListClient;
+import net.kokwind.course.dao.CoursePriceMapper;
+import net.kokwind.course.entity.Course;
+import net.kokwind.course.entity.CourseAndPrice;
+import net.kokwind.course.entity.CoursePrice;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.List;
+
+@Service
+public class CoursePriceService {
+    @Autowired
+    private CoursePriceMapper coursePriceMapper;
+    @Autowired
+    private CourseListClient courseListClient;
+
+    public CoursePrice getCoursePrice(Integer courseId) {
+        return coursePriceMapper.getCoursePrice(courseId);
+    }
+
+    public List<CourseAndPrice> getCourseAndPrice() {
+        List<CourseAndPrice> courseAndPriceList = new ArrayList<>();
+        List<Course> courseList = courseListClient.courseList();
+        for(Course course : courseList) {
+            if(course !=null){
+                CoursePrice coursePrice = coursePriceMapper.getCoursePrice(course.getCourseId());
+                CourseAndPrice courseAndPrice = new CourseAndPrice();
+                courseAndPrice.setId(course.getId());
+                courseAndPrice.setCourseId(course.getCourseId());
+                courseAndPrice.setName(course.getName());
+                courseAndPrice.setPrice(coursePrice.getPrice());
+                courseAndPriceList.add(courseAndPrice);
+            }
+        }
+        return courseAndPriceList;
+
+    }
+}
+```
+
+添加controller方法`getCourseAndPrice()`
+
+```java
+package net.kokwind.course.controller;
+/**
+ * 描述： 课程价格控制器
+ */
+
+import net.kokwind.course.client.CourseListClient;
+import net.kokwind.course.entity.Course;
+import net.kokwind.course.entity.CourseAndPrice;
+import net.kokwind.course.entity.CoursePrice;
+import net.kokwind.course.service.CoursePriceService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+@RestController
+public class CoursePriceController {
+    @Autowired
+    private CoursePriceService coursePriceService;
+    @Autowired
+    private CourseListClient courseListClient;
+
+    @GetMapping("/price")
+    public Integer getCoursePrice(Integer courseId) {
+        CoursePrice coursePrice = coursePriceService.getCoursePrice(courseId);
+        return coursePrice.getPrice();
+    }
+
+    @GetMapping("/coursesInPrice")
+    public List<Course> getCourseListInPrice() {
+        List<Course> courses = courseListClient.courseList();
+        return courses;
+    }
+
+    @GetMapping("/coursesAndPrice")
+    public List<CourseAndPrice> getCourseAndPrice() {
+        List<CourseAndPrice> courseAndPrice = coursePriceService.getCourseAndPrice();
+        return courseAndPrice;
+    }
+}
+```
+
+启动测试
+
+![img.png](img/img14.png)
+
+
+
 
 ### 2.9 网关Zuul
 
+#### 2.9.1 为什么需要网关
+
+如果没有网关，我们每一个服务都需要添加签名校验、登录校验冗余问题
+
+Spring Cloude Zuul也是Eureka服务的一部分，需要注册到Eureka服务上去。
+
+我们后续都通过Zuul来访问，就不需要分别校验了。
+
+- API网关允许您将API请求（内部或外部）路由到正确的位置
+
+![img.png](img/img15.png)
+
+#### 2.9.2 集成Zuul
+
+##### 2.9.2.1 把自己注册到Eureka这个注册中心
+
+![image-20220424115343039](img/image-20220424115343039.png)
+
+
+![img.png](img/img16.png)
+
+##### 2.9.2.2 引入依赖
+
+首先它是`eureka-client`，然后是zuul
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>spring-cloud-course</artifactId>
+        <groupId>net.kokwind</groupId>
+        <version>0.0.1-SNAPSHOT</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>course-zuul</artifactId>
+
+    <properties>
+        <maven.compiler.source>8</maven.compiler.source>
+        <maven.compiler.target>8</maven.compiler.target>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-zuul</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
+```
+
+
+
+##### 2.9.2.3 写配置
+
+```
+spring.application.name=course-gateway
+server.port=9000
+logging.pattern.console=%clr(%d{${LOG_DATEFORMAT_PATTERN:HH:mm:ss.SSS}}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}) %clr(${PID:- }){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:%wEx}
+mybatis.configuration.map-underscore-to-camel-case=true
+eureka.client.service-url.defaultZone=http://localhost:8000/eureka/
+```
+
+
+
+##### 2.9.2.4 写启动类
+
+```java
+package net.kokwind.course;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.cloud.client.SpringCloudApplication;
+import org.springframework.cloud.netflix.zuul.EnableZuulProxy;
+
+/**
+ * 描述： 网关启动类
+ */
+@EnableZuulProxy
+@SpringCloudApplication
+public class ZuulGatewayApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(ZuulGatewayApplication.class, args);
+    }
+}
+```
+
+
+
+##### 2.9.3 启动Zuul
+
+通过访问Eureka可以看到Zuul已经注册上去了
+
+![img.png](img/img17.png)
+
+
+
+通过Zuul默认的配置可以访问到`course-list`和 `course-price`下的接口
+
+![img_1.png](img/img18.png)
+
+
+
+![img_2.png](img/img19.png)
 
 
 
 
-### 2.10 整体测试
+![img_3.png](img/img20.png)
+
+#### 2.9.4 修改Zuul默认配置
+
+如果觉得`course-price`这种访问比较长，可以通过修改配置实现自定义配置
+
+比如加整体的前缀kokwind
+
+把`course-list`变成`list`
+
+把`course-price`变成`price`
+
+
+
+```
+zuul.prefix=/kokwind
+zuul.routes.course-list.path=/list/**
+zuul.routes.course-list.service-id=course-list
+zuul.routes.course-price.path=/price/**
+zuul.routes.course-price.service-id=course-price
+```
+
+通过访问修改后的网址可以访问到了。
+
+![img.png](img/img21.png)
+
+
+
+#### 2.9.5 利用网关实现过滤器
+
+- pre 过滤器在路由请求之前运行
+- route 过滤器可以处理请求的实际路由
+- post 路由请求后运行过滤器
+- error 如果在处理请求的过程中发生错误，则过滤器将运行
+
+##### 2.9.5.1 新建过滤器
+
+pre 过滤器在路由请求之前运行，记录请求起始时间
+
+```java
+package net.kokwind.course.filter;
+
+
+import com.netflix.zuul.ZuulFilter;
+import com.netflix.zuul.context.RequestContext;
+import com.netflix.zuul.exception.ZuulException;
+import org.springframework.cloud.netflix.zuul.filters.support.FilterConstants;
+import org.springframework.stereotype.Component;
+
+/**
+ * 描述：     记录请求时间
+ */
+@Component
+public class PreRequestFilter extends ZuulFilter {
+
+    @Override
+    public String filterType() {
+        //过滤器的类型
+        return FilterConstants.PRE_TYPE;
+    }
+
+    @Override
+    public int filterOrder() {
+        //过滤器的执行顺序
+        return 0;
+    }
+
+    @Override
+    public boolean shouldFilter() {
+        //是否启用过滤器
+        return true;
+    }
+
+    @Override
+    public Object run() throws ZuulException {
+        RequestContext currentContext = RequestContext.getCurrentContext();
+        currentContext.set("startTime", System.currentTimeMillis());
+        System.out.println("过滤器已经记录时间");
+        return null;
+    }
+}
+
+```
+
+post 路由请求后运行过滤器，计算处理时间。
+
+```java
+package net.kokwind.course.filter;
+
+import com.netflix.zuul.ZuulFilter;
+import com.netflix.zuul.context.RequestContext;
+import com.netflix.zuul.exception.ZuulException;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cloud.netflix.zuul.filters.support.FilterConstants;
+import org.springframework.stereotype.Component;
+
+/**
+ * 描述：     请求处理后的过滤器
+ */
+@Component
+public class PostRequestFilter extends ZuulFilter {
+
+    @Override
+    public String filterType() {
+        return FilterConstants.POST_TYPE;
+    }
+
+    @Override
+    public int filterOrder() {
+        return FilterConstants.SEND_RESPONSE_FILTER_ORDER - 1;
+    }
+
+    @Override
+    public boolean shouldFilter() {
+        return true;
+    }
+
+    @Override
+    public Object run() throws ZuulException {
+        RequestContext currentContext = RequestContext.getCurrentContext();
+        Long startTime = (Long) currentContext.get("startTime");
+        long duration = System.currentTimeMillis() - startTime;
+        String requestURI = currentContext.getRequest().getRequestURI();
+        System.out.println("uri:" + requestURI + ",处理时长：" + duration);
+        return null;
+    }
+}
+
+```
+##### 2.9.5.2 测试过滤器
+
+访问请求
+![img_1.png](img/img23.png)
+
+查看日志
+![img.png](img/img22.png)
 
 
 
